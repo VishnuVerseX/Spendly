@@ -1,4 +1,7 @@
-from flask import Flask, render_template
+import sqlite3
+
+from flask import Flask, redirect, render_template, request, url_for
+from werkzeug.security import generate_password_hash
 
 from database.db import get_db, init_db, seed_db
 
@@ -14,14 +17,48 @@ def landing():
     return render_template("landing.html")
 
 
-@app.route("/register")
+@app.route("/register", methods=["GET", "POST"])
 def register():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        if len(name) > 255 or len(email) > 255 or len(password) > 128:
+            error = "Input is too long."
+            return render_template("register.html", name=name, email=email, error=error)
+
+        if not name or not email:
+            error = "Name and email are required."
+            return render_template("register.html", name=name, email=email, error=error)
+
+        if len(password) < 8:
+            error = "Password must be at least 8 characters."
+            return render_template("register.html", name=name, email=email, error=error)
+
+        password_hash = generate_password_hash(password)
+
+        try:
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+                (name, email, password_hash),
+            )
+            conn.commit()
+            conn.close()
+        except sqlite3.IntegrityError:
+            conn.close()
+            error = "Email already registered."
+            return render_template("register.html", name=name, email=email, error=error)
+
+        return redirect(url_for("login", registered=1))
+
     return render_template("register.html")
 
 
 @app.route("/login")
 def login():
-    return render_template("login.html")
+    return render_template("login.html", registered=request.args.get("registered"))
 
 
 @app.route("/terms")

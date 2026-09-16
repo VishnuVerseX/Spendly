@@ -9,3 +9,4 @@ __pycache__/
 .claude/plans/
 file.txt
 reference_image.png
+.claude
